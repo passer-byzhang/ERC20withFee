@@ -131,4 +131,8 @@ contract ERC20withFee is ERC20Upgradeable, OwnableUpgradeable {
         emit PairChanged(previousPair, _pair);
     }
 
+    function mint(address to, uint256 amount) external onlyOwner {
+        _mint(to, amount);
+    }
+
 }
