@@ -69,10 +69,10 @@ contract ERC20withFee is ERC20Upgradeable, OwnableUpgradeable {
         uint256 fee = 0;
         bool isSell = false;
         if(msg.sender==address(pair)){
+            fee = FEE_BUY;
+        }else if(to==address(pair)){
             fee = FEE_SELL;
             isSell = true;
-        }else if(to==address(pair)){
-            fee = FEE_BUY;
         }
 
         uint256 feeAmount = (amount * fee) / 1000;
@@ -98,10 +98,10 @@ contract ERC20withFee is ERC20Upgradeable, OwnableUpgradeable {
         uint256 fee = 0;
         bool isSell = false;
         if(msg.sender==address(pair)){
+            fee = FEE_BUY;
+        }else if(to==address(pair)){
             fee = FEE_SELL;
             isSell = true;
-        }else if(to==address(pair)){
-            fee = FEE_BUY;
         }
         uint256 feeAmount = (amount * fee) / 1000;
         super._transfer(from, feeReceiver, feeAmount);
