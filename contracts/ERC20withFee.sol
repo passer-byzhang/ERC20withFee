@@ -30,6 +30,10 @@ contract ERC20withFee is ERC20Upgradeable, OwnableUpgradeable {
         address indexed previousReceiver,
         address indexed newReceiver
     );
+    event PairChanged(
+        address indexed previousPair,
+        address indexed newPair
+    );
 
     error UnderMinTransferAmount(uint256 amount, uint256 minTransferAmount);
     IUniswapV2Pair public pair;
@@ -117,6 +121,14 @@ contract ERC20withFee is ERC20Upgradeable, OwnableUpgradeable {
         address previousReceiver = feeReceiver;
         feeReceiver = _feeReceiver;
         emit FeeReceiverChanged(previousReceiver, _feeReceiver);
+    }
+
+    function setPair(address _pair) external onlyOwner {
+        require(_pair != address(0), "Pair cannot be the zero address");
+        address previousPair = address(pair);
+        pair = IUniswapV2Pair(_pair);
+        require(pair.token0() == address(this) || pair.token1() == address(this), "Invalid pair");
+        emit PairChanged(previousPair, _pair);
     }
 
 }
