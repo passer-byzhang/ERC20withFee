@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "./IUniswapV2Pair.sol";
+
 // Uncomment this line to use console.log
 // import "hardhat/console.sol";
 
@@ -11,6 +12,8 @@ contract ERC20withFee is ERC20Upgradeable, OwnableUpgradeable {
     uint256 constant FEE_BUY = 20; //2%
     uint256 constant MIN_TRANSFER_AMOUNT = 10;
     address public feeReceiver;
+
+    mapping(address => bool) public isWhitelisted;
 
     event Initialized(
         string name,
@@ -30,13 +33,15 @@ contract ERC20withFee is ERC20Upgradeable, OwnableUpgradeable {
         address indexed previousReceiver,
         address indexed newReceiver
     );
-    event PairChanged(
-        address indexed previousPair,
-        address indexed newPair
+    event PairChanged(address indexed previousPair, address indexed newPair);
+    event SetWhitelisted(
+        address indexed listedAddress,
+        bool indexed isWhitelisted
     );
-
     error UnderMinTransferAmount(uint256 amount, uint256 minTransferAmount);
+
     IUniswapV2Pair public pair;
+
     function initialize(
         string memory name,
         string memory symbol,
@@ -48,14 +53,11 @@ contract ERC20withFee is ERC20Upgradeable, OwnableUpgradeable {
         __Ownable_init(owner);
         feeReceiver = _feeReceiver;
         pair = IUniswapV2Pair(_pair);
-        require(pair.token0() == address(this) || pair.token1() == address(this), "Invalid pair");
-        emit Initialized(
-            name,
-            symbol,
-            feeReceiver,
-            owner,
-            MIN_TRANSFER_AMOUNT
+        require(
+            pair.token0() == address(this) || pair.token1() == address(this),
+            "Invalid pair"
         );
+        emit Initialized(name, symbol, feeReceiver, owner, MIN_TRANSFER_AMOUNT);
     }
 
     function transfer(
@@ -68,20 +70,23 @@ contract ERC20withFee is ERC20Upgradeable, OwnableUpgradeable {
         address owner = _msgSender();
         uint256 fee = 0;
         bool isSell = false;
-        if(msg.sender==address(pair)){
-            fee = FEE_BUY;
-        }else if(to==address(pair)){
-            fee = FEE_SELL;
-            isSell = true;
+        if (!isWhitelisted[owner] && !isWhitelisted[to]) {
+            if (msg.sender == address(pair)) {
+                fee = FEE_BUY;
+            } else if (to == address(pair)) {
+                fee = FEE_SELL;
+                isSell = true;
+            }
         }
 
         uint256 feeAmount = (amount * fee) / 1000;
-        super._transfer(owner, feeReceiver, feeAmount);
-        uint256 transferAmount = amount - feeAmount;
-        super._transfer(owner, to, transferAmount);
-        if(fee>0){
+
+        if (fee > 0) {
+            super._transfer(owner, feeReceiver, feeAmount);
             emit TransferWithFee(owner, to, amount, feeAmount, isSell);
         }
+        uint256 transferAmount = amount - feeAmount;
+        super._transfer(owner, to, transferAmount);
         return true;
     }
 
@@ -97,19 +102,22 @@ contract ERC20withFee is ERC20Upgradeable, OwnableUpgradeable {
         _spendAllowance(from, spender, amount);
         uint256 fee = 0;
         bool isSell = false;
-        if(msg.sender==address(pair)){
-            fee = FEE_BUY;
-        }else if(to==address(pair)){
-            fee = FEE_SELL;
-            isSell = true;
+        if (!isWhitelisted[from] && !isWhitelisted[to]) {
+            if (msg.sender == address(pair)) {
+                fee = FEE_BUY;
+            } else if (to == address(pair)) {
+                fee = FEE_SELL;
+                isSell = true;
+            }
         }
         uint256 feeAmount = (amount * fee) / 1000;
-        super._transfer(from, feeReceiver, feeAmount);
-        uint256 transferAmount = amount - feeAmount;
-        super._transfer(from, to, transferAmount);
-        if(fee>0){
+
+        if (fee > 0) {
+            super._transfer(from, feeReceiver, feeAmount);
             emit TransferWithFee(from, to, amount, feeAmount, isSell);
         }
+        uint256 transferAmount = amount - feeAmount;
+        super._transfer(from, to, transferAmount);
         return true;
     }
 
@@ -127,7 +135,10 @@ contract ERC20withFee is ERC20Upgradeable, OwnableUpgradeable {
         require(_pair != address(0), "Pair cannot be the zero address");
         address previousPair = address(pair);
         pair = IUniswapV2Pair(_pair);
-        require(pair.token0() == address(this) || pair.token1() == address(this), "Invalid pair");
+        require(
+            pair.token0() == address(this) || pair.token1() == address(this),
+            "Invalid pair"
+        );
         emit PairChanged(previousPair, _pair);
     }
 
@@ -135,4 +146,11 @@ contract ERC20withFee is ERC20Upgradeable, OwnableUpgradeable {
         _mint(to, amount);
     }
 
+    function setWhitelisted(
+        address _address,
+        bool _isWhitelisted
+    ) external onlyOwner {
+        isWhitelisted[_address] = _isWhitelisted;
+        emit SetWhitelisted(_address, _isWhitelisted);
+    }
 }
